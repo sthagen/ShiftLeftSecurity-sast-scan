@@ -19,11 +19,12 @@ import subprocess
 
 import reporter.grafeas as grafeas
 import reporter.licence as licence
+from rich.progress import Progress
 
 import lib.config as config
 import lib.convert as convertLib
 import lib.utils as utils
-from lib.logger import DEBUG, LOG
+from lib.logger import DEBUG, LOG, console
 from lib.telemetry import track
 
 
@@ -46,7 +47,7 @@ def use_java(env):
 
 def should_suppress_output(type_str, command):
     """
-    Method to indicate if the tool's output should be suppressed
+    Method to find if the tool's output should be suppressed
     """
     if "credscan" in type_str:
         return True
@@ -61,7 +62,7 @@ def should_suppress_output(type_str, command):
 
 def should_convert(convert, tool_name, command, report_fname):
     """
-    Method to indicate if sarif conversion should be performed
+    Method to find if sarif conversion should be performed
     """
     if (
         convert
@@ -77,6 +78,21 @@ def should_convert(convert, tool_name, command, report_fname):
     return False
 
 
+def should_show_progress():
+    """
+    Method to find if progress bar should be shown in the console. Progress bar is not rendering quite well on CI logs
+    """
+    progressVisible = True
+    # Hide progress bars in CI environments
+    if (
+        config.get("CI")
+        or config.get("HIDE_PROGRESS")
+        or config.get("WORKSPACE", "").startswith("http")
+    ):
+        progressVisible = False
+    return progressVisible
+
+
 def exec_tool(args, cwd=None, env=utils.get_env(), stdout=subprocess.DEVNULL):
     """
     Convenience method to invoke cli tools
@@ -90,29 +106,43 @@ def exec_tool(args, cwd=None, env=utils.get_env(), stdout=subprocess.DEVNULL):
     Returns:
       CompletedProcess instance
     """
-    try:
-        env = use_java(env)
-        LOG.info("=" * 80)
-        LOG.debug('⚡︎ Executing "{}"'.format(" ".join(args)))
-        stderr = subprocess.DEVNULL
-        if LOG.isEnabledFor(DEBUG):
-            stderr = subprocess.STDOUT
-        cp = subprocess.run(
-            args,
-            stdout=stdout,
-            stderr=stderr,
-            cwd=cwd,
-            env=env,
-            check=False,
-            shell=False,
-            encoding="utf-8",
-        )
-        if cp and LOG.isEnabledFor(DEBUG) and cp.returncode:
-            LOG.debug(cp.stdout)
-        return cp
-    except Exception as e:
-        LOG.debug(e)
-        return None
+    task = None
+    with Progress(
+        console=console,
+        redirect_stderr=False,
+        redirect_stdout=False,
+        refresh_per_second=1,
+        transient=True,
+    ) as progress:
+        try:
+            env = use_java(env)
+            LOG.debug('⚡︎ Executing "{}"'.format(" ".join(args)))
+            stderr = subprocess.DEVNULL
+            if LOG.isEnabledFor(DEBUG):
+                stderr = subprocess.STDOUT
+            progressVisible = should_show_progress()
+            task = progress.add_task(
+                "[green]Scanning", total=10, start=False, visible=progressVisible
+            )
+            cp = subprocess.run(
+                args,
+                stdout=stdout,
+                stderr=stderr,
+                cwd=cwd,
+                env=env,
+                check=False,
+                shell=False,
+                encoding="utf-8",
+            )
+            if cp and LOG.isEnabledFor(DEBUG) and cp.returncode:
+                LOG.debug(cp.stdout)
+            progress.update(task, completed=10, total=10, visible=progressVisible)
+            return cp
+        except Exception as e:
+            if task:
+                progress.update(task, completed=2, total=10, visible=False)
+            LOG.debug(e)
+            return None
 
 
 def execute_default_cmd(
