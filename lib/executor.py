@@ -120,9 +120,8 @@ def exec_tool(args, cwd=None, env=utils.get_env(), stdout=subprocess.DEVNULL):
             stderr = subprocess.DEVNULL
             if LOG.isEnabledFor(DEBUG):
                 stderr = subprocess.STDOUT
-            progressVisible = should_show_progress()
             task = progress.add_task(
-                "[green]Scanning", total=10, start=False, visible=progressVisible
+                "[green]Scanning", total=10, start=False
             )
             cp = subprocess.run(
                 args,
@@ -136,7 +135,7 @@ def exec_tool(args, cwd=None, env=utils.get_env(), stdout=subprocess.DEVNULL):
             )
             if cp and LOG.isEnabledFor(DEBUG) and cp.returncode:
                 LOG.debug(cp.stdout)
-            progress.update(task, completed=10, total=10, visible=progressVisible)
+            progress.update(task, completed=10, total=10)
             return cp
         except Exception as e:
             if task:
