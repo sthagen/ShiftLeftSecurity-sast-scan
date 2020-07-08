@@ -15,34 +15,33 @@ ShiftLeft Scan is a free open-source security tool for modern DevOps teams. With
 
 ## Bundled tools
 
-| Programming Language | Tools                               |
-| -------------------- | ----------------------------------- |
-| ansible              | ansible-lint                        |
-| apex                 | pmd                                 |
-| aws                  | checkov                             |
-| bash                 | shellcheck                          |
-| bom                  | cdxgen                              |
-| credscan             | gitleaks                            |
-| depscan              | dep-scan                            |
-| go                   | gosec, staticcheck                  |
-| groovy               | find-sec-bugs                       |
-| java                 | cdxgen, gradle, find-sec-bugs, pmd  |
-| jsp                  | pmd, find-sec-bugs                  |
-| json                 | jq, jsondiff, jsonschema            |
-| kotlin               | detekt, find-sec-bugs               |
-| scala                | find-sec-bugs                       |
-| kubernetes           | checkov, kubesec, kube-score        |
-| nodejs               | cdxgen, njsscan, eslint, yarn, rush |
-| puppet               | puppet-lint                         |
-| php                  | psalm, phpstan (ide only)           |
-| plsql                | pmd                                 |
-| python               | bandit, cdxgen, pipenv              |
-| ruby                 | cyclonedx-ruby                      |
-| rust                 | cdxgen                              |
-| terraform            | checkov, tfsec                      |
-| Visual Force (vf)    | pmd                                 |
-| Apache Velocity (vm) | pmd                                 |
-| yaml                 | yamllint                            |
+| Programming Language | Tools                                |
+| -------------------- | ------------------------------------ |
+| ansible              | ansible-lint                         |
+| apex                 | pmd                                  |
+| aws                  | checkov                              |
+| bash                 | shellcheck                           |
+| bom                  | cdxgen                               |
+| credscan             | gitleaks                             |
+| depscan              | dep-scan                             |
+| go                   | gosec, staticcheck                   |
+| groovy               | find-sec-bugs                        |
+| java                 | find-sec-bugs, pmd                   |
+| jsp                  | pmd, find-sec-bugs                   |
+| json                 | jq, jsondiff, jsonschema             |
+| kotlin               | detekt, find-sec-bugs                |
+| scala                | find-sec-bugs                        |
+| kubernetes           | checkov, kubesec, kube-score         |
+| nodejs               | depscan, njsscan, eslint, yarn, rush |
+| puppet               | puppet-lint                          |
+| php                  | psalm, phpstan (ide only)            |
+| plsql                | pmd                                  |
+| python               | bandit, depscan, pipenv              |
+| rust                 | depscan                              |
+| terraform            | checkov, tfsec                       |
+| Visual Force (vf)    | pmd                                  |
+| Apache Velocity (vm) | pmd                                  |
+| yaml                 | yamllint                             |
 
 ## Bundled languages/runtime
 
