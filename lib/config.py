@@ -38,6 +38,8 @@ phpstan_config = os.path.join(TOOLS_CONFIG_DIR, "phpstan.neon.dist")
 detekt_config = os.path.join(TOOLS_CONFIG_DIR, "detekt-config.yml")
 detekt_jar = "/usr/local/bin/detekt-cli.jar"
 
+pysa_config_dir = os.path.join(TOOLS_CONFIG_DIR, "pysa")
+
 DEPSCAN_CMD = "/usr/local/bin/depscan"
 PMD_CMD = "/opt/pmd-bin/bin/run.sh pmd"
 SPOTBUGS_HOME = "/opt/spotbugs"

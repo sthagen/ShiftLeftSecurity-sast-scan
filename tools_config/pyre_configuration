@@ -1,0 +1,14 @@
+{
+  "source_directories": ["."],
+  "taint_models_path": [
+      "pysa/stubs/taint",
+      ""
+  ],
+  "search_path": [
+      "stubs/",
+      ""
+  ],
+  "exclude": [
+      ""
+  ]
+}
