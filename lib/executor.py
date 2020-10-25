@@ -128,13 +128,22 @@ def exec_tool(  # scan:ignore
             if cp and stdout == subprocess.PIPE:
                 for line in cp.stdout:
                     progress.update(task, completed=5)
-            if cp and LOG.isEnabledFor(DEBUG) and cp.returncode:
+            if (
+                cp
+                and LOG.isEnabledFor(DEBUG)
+                and cp.returncode
+                and cp.stdout is not None
+            ):
                 LOG.debug(cp.stdout)
             progress.update(task, completed=100, total=100)
             return cp
         except Exception as e:
             if task:
                 progress.update(task, completed=20, total=10, visible=False)
+            if not LOG.isEnabledFor(DEBUG):
+                LOG.info(
+                    f"{tool_name} has reported few errors. To view, pass the environment variable SCAN_DEBUG_MODE=debug"
+                )
             LOG.debug(e)
             return None
 
@@ -164,7 +173,6 @@ def execute_default_cmd(  # scan:ignore
     """
     # Check if there is a default command specified for the given type
     # Create the reports dir
-    os.makedirs(reports_dir, exist_ok=True)
     report_fname_prefix = os.path.join(reports_dir, tool_name + "-report")
     # Look for any additional direct arguments for the tool and inject them
     if config.get(tool_name + "_direct_args"):

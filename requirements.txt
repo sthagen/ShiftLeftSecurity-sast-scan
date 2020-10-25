@@ -8,10 +8,9 @@ requests
 bandit
 ansible-lint
 pipenv
-checkov==1.0.487
+checkov==1.0.546
 yamllint
 njsscan
 rich
 PyGithub
-astsearch
 PyYAML

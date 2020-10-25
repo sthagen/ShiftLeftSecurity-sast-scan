@@ -21,6 +21,7 @@ Multi-language static analysis scanner
 """
 import argparse
 import os
+import signal
 import sys
 import tempfile
 import time
@@ -115,9 +116,96 @@ def build_args():
     return parser.parse_args()
 
 
-def scan(type_list, src, reports_dir, convert, scan_mode, repo_context):
+def scan_project_types(
+    pool, type_list, src, reports_dir, convert, scan_mode, repo_context
+):
     """
     Method to initiate scan of the codebase
+
+    Args:
+      pool Process pool to submit tasks to
+      type_list List of project type
+      src Project dir
+      reports_dir Directory for output reports
+      convert Boolean to enable normalisation of reports json
+      scan_mode Scan mode string
+      repo_context Repo context
+    """
+    for type_str in type_list:
+        # Find if there is any scan mode specific config
+        cmd_map_list = config.get("scan_tools_args_map").get(type_str + "-" + scan_mode)
+        if not cmd_map_list:
+            cmd_map_list = config.get("scan_tools_args_map").get(type_str)
+        if cmd_map_list:
+            # Default command list can be in the form of a list or dict
+            if isinstance(cmd_map_list, list):
+                pool.apply_async(
+                    execute_default_cmd,
+                    (
+                        cmd_map_list,
+                        type_str,
+                        type_str,
+                        src,
+                        reports_dir,
+                        convert,
+                        scan_mode,
+                        repo_context,
+                    ),
+                )
+            elif isinstance(cmd_map_list, dict):
+                for cmd_key, cmd_val in cmd_map_list.items():
+                    if "init" in cmd_key or type_str == "php":
+                        execute_default_cmd(
+                            cmd_val,
+                            type_str,
+                            cmd_key,
+                            src,
+                            reports_dir,
+                            convert,
+                            scan_mode,
+                            repo_context,
+                        )
+                    else:
+                        pool.apply_async(
+                            execute_default_cmd,
+                            (
+                                cmd_val,
+                                type_str,
+                                cmd_key,
+                                src,
+                                reports_dir,
+                                convert,
+                                scan_mode,
+                                repo_context,
+                            ),
+                        )
+        else:
+            # Look for any _scan function in this module for execution
+            try:
+                dfn = getattr(sys.modules[__name__], "%s_scan" % type_str, None)
+                if dfn:
+                    pool.apply_async(dfn, (src, reports_dir, convert, repo_context))
+                else:
+                    x_scan(type_str)
+            except Exception as e:
+                LOG.debug(e)
+                LOG.warning(
+                    "Scan using the {} plugin did not produce valid result".format(
+                        type_str
+                    )
+                )
+
+
+def init_worker():
+    """
+    Handler for worker processes to let their parent handle interruptions
+    """
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+
+def scan(type_list, src, reports_dir, convert, scan_mode, repo_context):
+    """
+    Wrapper around scan_project_types to scan the codebase
 
     Args:
       type_list List of project type
@@ -128,75 +216,14 @@ def scan(type_list, src, reports_dir, convert, scan_mode, repo_context):
       repo_context Repo context
     """
     if __name__ == "__main__":
-        with Pool(processes=os.cpu_count()) as pool:
-            for type_str in type_list:
-                # Find if there is any scan mode specific config
-                cmd_map_list = config.get("scan_tools_args_map").get(
-                    type_str + "-" + scan_mode
+        with Pool(processes=os.cpu_count(), initializer=init_worker) as pool:
+            try:
+                scan_project_types(
+                    pool, type_list, src, reports_dir, convert, scan_mode, repo_context
                 )
-                if not cmd_map_list:
-                    cmd_map_list = config.get("scan_tools_args_map").get(type_str)
-                if cmd_map_list:
-                    # Default command list can be in the form of a list or dict
-                    if isinstance(cmd_map_list, list):
-                        pool.apply_async(
-                            execute_default_cmd,
-                            (
-                                cmd_map_list,
-                                type_str,
-                                type_str,
-                                src,
-                                reports_dir,
-                                convert,
-                                scan_mode,
-                                repo_context,
-                            ),
-                        )
-                    elif isinstance(cmd_map_list, dict):
-                        for cmd_key, cmd_val in cmd_map_list.items():
-                            if "init" in cmd_key or type_str == "php":
-                                execute_default_cmd(
-                                    cmd_val,
-                                    type_str,
-                                    cmd_key,
-                                    src,
-                                    reports_dir,
-                                    convert,
-                                    scan_mode,
-                                    repo_context,
-                                )
-                            else:
-                                pool.apply_async(
-                                    execute_default_cmd,
-                                    (
-                                        cmd_val,
-                                        type_str,
-                                        cmd_key,
-                                        src,
-                                        reports_dir,
-                                        convert,
-                                        scan_mode,
-                                        repo_context,
-                                    ),
-                                )
-                else:
-                    # Look for any _scan function in this module for execution
-                    try:
-                        dfn = getattr(sys.modules[__name__], "%s_scan" % type_str, None)
-                        if dfn:
-                            pool.apply_async(
-                                dfn, (src, reports_dir, convert, repo_context)
-                            )
-                        else:
-                            x_scan(type_str)
-                    except Exception as e:
-                        LOG.debug(e)
-                        LOG.warning(
-                            "Scan using the {} plugin did not produce valid result".format(
-                                type_str
-                            )
-                        )
-            pool.close()
+                pool.close()
+            except KeyboardInterrupt:
+                pool.terminate()
             pool.join()
 
 
@@ -290,7 +317,7 @@ def bandit_scan(src, reports_dir, convert, repo_context):
         "-n",
         "3",
         "-s",
-        "B101,B102,B105,B307,B308,B310,B322,B404,B601,B602,B603,B604,B605,B701,B702,B703",
+        config.get("BANDIT_IGNORED_RULES", ""),
         "-iii",
         "-ll",
         *convert_args,
@@ -532,12 +559,64 @@ def bomgen(src, reports_dir, convert, repo_context):
     exec_tool("cdxgen", bom_args, src)
 
 
+def should_skip(src_dir, reports_dir, repo_context, scan_mode):
+    """
+    Method to check if a scan should be skipped
+
+    :param src_dir: Source directory
+    :param reports_dir: Reports directory
+    :param repo_context: Repo context
+    :param scan_mode: Scan mode
+    :return: True if scan should be skipped. False otherwise.
+    """
+    if (
+        scan_mode == "ci"
+        and repo_context.get("botUser")
+        and config.get("skip_bot_triggers")
+    ):
+        LOG.info(
+            f"""Scan will be skipped since the build was triggered by a bot '{repo_context.get("invokedBy")}'"""
+        )
+        # Create empty sarif file to prevent codeql upload action from failing
+        crep_fname = utils.get_report_file(
+            "empty-scan", reports_dir, True, ext_name="sarif"
+        )
+        convertLib.report("empty-scan", [], src_dir, None, [], [], crep_fname, None)
+        return True
+    return False
+
+
+def should_annotate(git_provider, repo_context, findings_file):
+    """
+    Method to check if the build or PR should get annotated.
+
+    :param git_provider: Git Provider string
+    :param repo_context: Repo context
+    :param findings_file: Findings json file
+    :return: True if build should be annotated. False otherwise.
+    """
+    annotate_flag = config.get("scan_annotate_pr", "")
+    if (
+        annotate_flag == "true" or annotate_flag == "1" or git_provider == "bitbucket"
+    ) and findings_file:
+        return True
+    if repo_context.get("pullRequest") and git_provider == "gitlab":
+        LOG.info(
+            "Scan can automatically add the summary as a merge request comment. To learn more - https://slscan.io/en/latest/integrations/gitlab/#merge-request-comment-feature"
+        )
+    return False
+
+
 def main():
     start_time = time.monotonic_ns()
     args = build_args()
     src_dir = args.src_dir
     if not args.src_dir:
         src_dir = os.getcwd()
+    reports_dir = args.reports_dir
+    if not reports_dir:
+        reports_dir = os.path.join(src_dir, "reports")
+    os.makedirs(reports_dir, exist_ok=True)
     type = args.scan_type
     scan_mode = args.scan_mode
     if scan_mode:
@@ -548,6 +627,9 @@ def main():
     # Set the source directory as an environment variable
     config.set("SAST_SCAN_SRC_DIR", src_dir)
     repo_context = context.find_repo_details(src_dir)
+    # Should we skip this scan
+    if should_skip(src_dir, reports_dir, repo_context, scan_mode):
+        sys.exit(0)
     workspace = os.getenv("WORKSPACE")
     if workspace is None and scan_mode != "ide":
         # In case of GitHub action empty workspace forces relative url
@@ -576,9 +658,6 @@ def main():
     else:
         console.print(product_logo, style="info")
     LOG.info("Scanning {} using plugins {}".format(src_dir, type))
-    reports_dir = args.reports_dir
-    if not reports_dir:
-        reports_dir = os.path.join(src_dir, "reports")
     if args.auto_build or config.get("scan_auto_build"):
         build_res = auto_build(type, src_dir, reports_dir)
         if not build_res:
@@ -596,11 +675,8 @@ def main():
         src_dir, repo_context, reports_dir, sarif_files
     )
     report_summary, build_status = analysis.summary(sarif_files, agg_fname)
-    annotate_flag = config.get("scan_annotate_pr", "")
     git_provider = provider.get_git_provider(repo_context)
-    if (
-        annotate_flag == "true" or annotate_flag == "1" or git_provider == "bitbucket"
-    ) and findings_file:
+    if should_annotate(git_provider, repo_context, findings_file):
         # Create PR status and Reports via the git provider
         git_provider.annotate_pr(
             repo_context, findings_file, report_summary, build_status
