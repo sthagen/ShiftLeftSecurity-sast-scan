@@ -231,7 +231,9 @@ def x_scan(type_str):
     """Default placeholder scan method for missing scanners
     """
     LOG.info(
-        "Is there any open-source scanner for {}? Please let us know 👍".format(type_str)
+        "Is there any open-source scanner for {}? Please let us know :thumbsup:".format(
+            type_str
+        )
     )
 
 
@@ -559,6 +561,14 @@ def bomgen(src, reports_dir, convert, repo_context):
     exec_tool("cdxgen", bom_args, src)
 
 
+def create_empty_result(src_dir, reports_dir):
+    # Create empty sarif file to prevent codeql upload action from failing
+    crep_fname = utils.get_report_file(
+        "empty-scan", reports_dir, True, ext_name="sarif"
+    )
+    convertLib.report("empty-scan", [], src_dir, None, [], [], crep_fname, None)
+
+
 def should_skip(src_dir, reports_dir, repo_context, scan_mode):
     """
     Method to check if a scan should be skipped
@@ -577,11 +587,7 @@ def should_skip(src_dir, reports_dir, repo_context, scan_mode):
         LOG.info(
             f"""Scan will be skipped since the build was triggered by a bot '{repo_context.get("invokedBy")}'"""
         )
-        # Create empty sarif file to prevent codeql upload action from failing
-        crep_fname = utils.get_report_file(
-            "empty-scan", reports_dir, True, ext_name="sarif"
-        )
-        convertLib.report("empty-scan", [], src_dir, None, [], [], crep_fname, None)
+        create_empty_result(src_dir, reports_dir)
         return True
     return False
 
@@ -666,6 +672,7 @@ def main():
             )
     scan(type, src_dir, reports_dir, args.convert, scan_mode, repo_context)
     sarif_files = [p.as_posix() for p in Path(reports_dir).rglob("*.sarif")]
+    depscan_files = [p.as_posix() for p in Path(reports_dir).rglob("depscan*.json")]
     agg_fname = None
     if scan_mode != "ide":
         agg_fname = utils.get_report_file(
@@ -674,7 +681,9 @@ def main():
     findings_file = inspect.convert_to_findings(
         src_dir, repo_context, reports_dir, sarif_files
     )
-    report_summary, build_status = analysis.summary(sarif_files, agg_fname)
+    report_summary, build_status = analysis.summary(
+        sarif_files, depscan_files, agg_fname
+    )
     git_provider = provider.get_git_provider(repo_context)
     if should_annotate(git_provider, repo_context, findings_file):
         # Create PR status and Reports via the git provider
@@ -700,6 +709,7 @@ def main():
         LOG.debug(
             "No scan summary was produced - {}, {}".format(sarif_files, agg_fname)
         )
+        create_empty_result(src_dir, reports_dir)
 
 
 if __name__ == "__main__":

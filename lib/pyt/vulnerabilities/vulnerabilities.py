@@ -289,9 +289,22 @@ def how_vulnerable(
             return VulnerabilityType.SANITISED
 
         if isinstance(current_node, BBorBInode):
-            if current_node.func_name in blackbox_mapping["propagates"]:
+            # Under some conditions such as sql queries containing method calls
+            # func_name is getting constructed incorrectly
+            if " " in current_node.func_name:
                 continue
-            elif current_node.func_name in blackbox_mapping["does_not_propagate"]:
+            simple_method_name = ""
+            if "." in current_node.func_name:
+                simple_method_name = current_node.func_name.split(".")[-1]
+            if (
+                current_node.func_name in blackbox_mapping["propagates"]
+                or simple_method_name in blackbox_mapping["propagates"]
+            ):
+                continue
+            elif (
+                current_node.func_name in blackbox_mapping["does_not_propagate"]
+                or simple_method_name in blackbox_mapping["does_not_propagate"]
+            ):
                 return VulnerabilityType.FALSE
             else:
                 vuln_deets["unknown_assignment"] = current_node
@@ -371,6 +384,9 @@ def get_vulnerability(source, sink, triggers, lattice, cfg, blackbox_mapping):
         if sink.sanitisers:
             for sanitiser in sink.sanitisers:
                 for cfg_node in triggers.sanitiser_dict[sanitiser]:
+                    # Break early with blackbox sanitizers
+                    if isinstance(cfg_node, BBorBInode):
+                        return None
                     if isinstance(cfg_node, AssignmentNode):
                         sanitiser_nodes.add(cfg_node)
                     elif isinstance(cfg_node, IfNode):
@@ -387,7 +403,6 @@ def get_vulnerability(source, sink, triggers, lattice, cfg, blackbox_mapping):
             )
             if vulnerability_type == VulnerabilityType.FALSE:
                 continue
-
             vuln_deets["reassignment_nodes"] = chain
             return vuln_factory(vulnerability_type)(**vuln_deets)
     return None
