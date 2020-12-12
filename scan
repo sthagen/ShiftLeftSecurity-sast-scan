@@ -186,7 +186,7 @@ def scan_project_types(
                 if dfn:
                     pool.apply_async(dfn, (src, reports_dir, convert, repo_context))
                 else:
-                    x_scan(type_str)
+                    x_scan(type_str, src, reports_dir, convert, repo_context)
             except Exception as e:
                 LOG.debug(e)
                 LOG.warning(
@@ -227,14 +227,52 @@ def scan(type_list, src, reports_dir, convert, scan_mode, repo_context):
             pool.join()
 
 
-def x_scan(type_str):
-    """Default placeholder scan method for missing scanners
+def x_scan(type_str, src, reports_dir, convert, repo_context):
     """
-    LOG.info(
-        "Is there any open-source scanner for {}? Please let us know :thumbsup:".format(
-            type_str
-        )
+    Default placeholder scan method for missing scanners
+
+    Args:
+      type_str Project type
+      src Project dir
+      reports_dir Directory for output reports
+      convert Boolean to enable normalisation of reports json
+      repo_context Repo context
+    """
+    # Report file in the reports dir
+    report_fname = utils.get_report_file(
+        f"source-{type_str}", reports_dir, convert, ext_name="json"
     )
+    # Report file in the source dir
+    src_report_fname = utils.get_report_file(
+        f"source-{type_str}", src, convert, ext_name="json"
+    )
+    # SARIF file name for conversion
+    crep_fname = utils.get_report_file(
+        f"source-{type_str}", reports_dir, convert, ext_name="sarif"
+    )
+    # If there is an existing report available simply use it
+    if os.path.exists(crep_fname):
+        LOG.info(f"Found an existing SARIF report at {crep_fname} :thumbsup:")
+    elif os.path.exists(report_fname) and convert:
+        convertLib.convert_file(
+            f"source-{type_str}",
+            [],
+            src,
+            report_fname,
+            crep_fname,
+        )
+    elif os.path.exists(src_report_fname) and convert:
+        convertLib.convert_file(
+            f"source-{type_str}",
+            [],
+            src,
+            src_report_fname,
+            crep_fname,
+        )
+    else:
+        LOG.info(
+            f"Is there any open-source scanner for {type_str}? Please let us know :thumbsup:"
+        )
 
 
 def python_scan(src, reports_dir, convert, repo_context):
@@ -333,7 +371,11 @@ def bandit_scan(src, reports_dir, convert, repo_context):
             "source-python", reports_dir, convert, ext_name="sarif"
         )
         convertLib.convert_file(
-            "source-python", bandit_args[1:], src, report_fname, crep_fname,
+            "source-python",
+            bandit_args[1:],
+            src,
+            report_fname,
+            crep_fname,
         )
 
 
@@ -412,7 +454,11 @@ def pmd_scan(src, reports_dir, convert, repo_context):
             "source-java", reports_dir, convert, ext_name="sarif"
         )
         convertLib.convert_file(
-            "source-java", pmd_args[1:], src, report_fname, crep_fname,
+            "source-java",
+            pmd_args[1:],
+            src,
+            report_fname,
+            crep_fname,
         )
 
 
@@ -473,7 +519,12 @@ def findsecbugs_scan(src, reports_dir, convert, repo_context):
                 "class", reports_dir, convert, ext_name="sarif"
             )
             convertLib.convert_file(
-                "class", findsec_args[1:], src, report_fname, crep_fname, j_files,
+                "class",
+                findsec_args[1:],
+                src,
+                report_fname,
+                crep_fname,
+                j_files,
             )
 
 
@@ -521,6 +572,11 @@ def sec_scan(src, reports_dir, convert, repo_context):
       convert Boolean to enable normalisation of reports json
       repo_context Repo context
     """
+    if not utils.check_command("njsscan"):
+        LOG.warning(
+            "njsscan is no longer bundled with scan. Please use shiftleft/scan-oss container image if this tool is required."
+        )
+        return
     convert_args = []
     report_fname = utils.get_report_file("source-js", reports_dir, convert)
     if reports_dir or convert:
@@ -542,7 +598,11 @@ def sec_scan(src, reports_dir, convert, repo_context):
             "source-js", reports_dir, convert, ext_name="sarif"
         )
         convertLib.convert_file(
-            "source-js", sec_args[1:], src, report_fname, crep_fname,
+            "source-js",
+            sec_args[1:],
+            src,
+            report_fname,
+            crep_fname,
         )
 
 

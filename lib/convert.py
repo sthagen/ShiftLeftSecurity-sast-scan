@@ -306,6 +306,9 @@ def extract_from_file(
                         issues += rd.get("results", {}).get("failed_checks")
                 else:
                     issues = report_data.get("results", {}).get("failed_checks")
+            elif tool_name == "source-ruby":
+                issues = report_data.get("warnings", [])
+                issues += report_data.get("errors", [])
             elif isinstance(report_data, list):
                 issues = report_data
             else:
@@ -379,7 +382,12 @@ def suppress_issues(issues):
 
 
 def convert_file(
-    tool_name, tool_args, working_dir, report_file, converted_file, file_path_list=None,
+    tool_name,
+    tool_args,
+    working_dir,
+    report_file,
+    converted_file,
+    file_path_list=None,
 ):
     """Convert report file
 
@@ -441,7 +449,6 @@ def report(
     repo_details = find_repo_details(working_dir)
     log_uuid = str(uuid.uuid4())
     run_uuid = config.get("run_uuid")
-
     # Populate metrics
     metrics = {
         "total": 0,
@@ -674,7 +681,7 @@ def create_result(tool_name, issue, rules, rule_indices, file_path_list, working
 
 def level_from_severity(severity):
     """Converts tool's severity to the 4 level
-        suggested by SARIF
+    suggested by SARIF
     """
     if severity == "CRITICAL":
         return "error"
@@ -725,8 +732,7 @@ def add_region_and_context_region(physical_location, line_number, code):
 
 
 def parse_code(code):
-    """Method to parse the code to extract line number and snippets
-    """
+    """Method to parse the code to extract line number and snippets"""
     code_lines = code.split("\n")
 
     # The last line from the split has nothing in it; it's an artifact of the
