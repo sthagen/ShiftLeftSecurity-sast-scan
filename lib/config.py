@@ -155,6 +155,8 @@ ignore_directories = [
     "unittests_legacy",
     "stubs",
     "cypress",
+    "mock",
+    "mocks",
 ]
 
 # Ignore files list
@@ -186,6 +188,7 @@ ignore_files = [
     ".bundle.js",
     ".snap",
     ".pb.go",
+    ".tests.py",
 ]
 
 # Tool specific ignored rules
@@ -195,6 +198,36 @@ TFSEC_IGNORED_RULES = (
 BANDIT_IGNORED_RULES = (
     "B101,B102,B105,B307,B308,B310,B322,B404,B601,B602,B603,B604,B605,B701,B702,B703"
 )
+
+
+# Suppression fingerprints
+def get_suppress_fingerprints(working_dir):
+    # To suppress based on fingerprint create a file called .sastscan.baseline in the root directory
+    # {"scanPrimaryLocationHash": [], "scanTagsHash": [], "scanFileHash": []}
+    suppress_fingerprints = {
+        "scanPrimaryLocationHash": [],
+        "scanTagsHash": [],
+        "scanFileHash": [],
+    }
+    src_dir = working_dir if working_dir else get("SAST_SCAN_SRC_DIR")
+    if src_dir:
+        scanbaseline = os.path.join(src_dir, ".sastscan.baseline")
+        if os.path.exists(scanbaseline):
+            with open(scanbaseline, "r") as baselinefile:
+                try:
+                    baselinedata = json.loads(baselinefile.read())
+                    # We are interested only in baseline_fingerprints in the baseline file
+                    if baselinedata.get("baseline_fingerprints"):
+                        tmp_suppress_fingerprints = baselinedata.get(
+                            "baseline_fingerprints"
+                        )
+                        if tmp_suppress_fingerprints:
+                            suppress_fingerprints.update(tmp_suppress_fingerprints)
+                            set("suppress_fingerprints", suppress_fingerprints)
+                            return suppress_fingerprints
+                except Exception:
+                    print(".sastscan.baseline should be a valid json file")
+    return suppress_fingerprints
 
 
 def get(configName, default_value=None):
@@ -1296,11 +1329,14 @@ def reload():
         scanrc = os.path.join(get("SAST_SCAN_SRC_DIR"), ".sastscanrc")
         if os.path.exists(scanrc):
             with open(scanrc, "r") as rcfile:
-                new_config = json.loads(rcfile.read())
-                for key, value in new_config.items():
-                    exis_config = get(key)
-                    if isinstance(exis_config, dict):
-                        exis_config = exis_config.update(value)
-                        set(key, exis_config)
-                    else:
-                        set(key, value)
+                try:
+                    new_config = json.loads(rcfile.read())
+                    for key, value in new_config.items():
+                        exis_config = get(key)
+                        if isinstance(exis_config, dict):
+                            exis_config.update(value)
+                            set(key, exis_config)
+                        else:
+                            set(key, value)
+                except Exception:
+                    print(".sastscanrc should be a valid json file")

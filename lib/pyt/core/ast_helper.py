@@ -8,7 +8,6 @@ import subprocess
 from functools import lru_cache
 
 from _ast import AST
-
 from lib.pyt.core.astsearch import ASTPatternFinder, prepare_pattern
 from lib.pyt.core.transformer import PytTransformer
 
@@ -153,6 +152,13 @@ def get_assignments_as_dict(pattern, ast_tree):
                         "left_hand_side": left_hand_side,
                         "right_hand_side": right_hand_side,
                     }
+        elif isinstance(node, ast.Call):
+            for keyword in node.keywords:
+                if isinstance(keyword.value, ast.Constant):
+                    literals_dict[keyword.arg] = {
+                        "left_hand_side": keyword,
+                        "right_hand_side": keyword.value,
+                    }
     return literals_dict
 
 
@@ -160,7 +166,7 @@ def get_as_list(ast_list):
     ret = []
     if not ast_list:
         return ret
-    if isinstance(ast_list, ast.List):
+    if isinstance(ast_list, (ast.List, ast.Tuple)):
         for li in ast_list.elts:
             if isinstance(li, ast.Constant):
                 ret.append(li.value)
@@ -192,7 +198,7 @@ def has_import_like(module_name, ast_tree):
         return False
     ret = False
     for match in matches:
-        if isinstance(match, ast.Import) or isinstance(match, ast.ImportFrom):
+        if isinstance(match, (ast.Import, ast.ImportFrom)):
             for name in match.names:
                 if name.name.lower().startswith(module_name.lower()):
                     return True
@@ -219,7 +225,7 @@ def has_import(module_name, ast_tree):
     if not matches:
         return False
     for match in matches:
-        if isinstance(match, ast.Import) or isinstance(match, ast.ImportFrom):
+        if isinstance(match, (ast.Import, ast.ImportFrom)):
             for name in match.names:
                 if name.name.lower() == module_name.lower():
                     return True

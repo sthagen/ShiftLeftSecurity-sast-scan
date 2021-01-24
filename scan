@@ -302,6 +302,11 @@ def py_deep_scan(src, reports_dir, convert, repo_context):
     report_fname = utils.get_report_file(
         "taint-python", reports_dir, convert, ext_name="json"
     )
+    web_route_only = config.get("WEB_ROUTE_ONLY", False)
+    if not web_route_only:
+        LOG.info(
+            "Set the environment variable `WEB_ROUTE_ONLY` to narrow the analysis scope.\nThis often helps reduce false positives and would become the default soon."
+        )
     py_files = utils.find_files(src, ".py")
     LOG.debug(f"Scanning {len(py_files)} python files ...")
     try:
@@ -573,8 +578,14 @@ def sec_scan(src, reports_dir, convert, repo_context):
       repo_context Repo context
     """
     if not utils.check_command("njsscan"):
-        LOG.warning(
+        LOG.debug(
             "njsscan is no longer bundled with scan. Please use shiftleft/scan-oss container image if this tool is required."
+        )
+        LOG.debug(
+            "Know any decent open-source SAST tool for JavaScript? It should use AST and CFG and not just regex or grep. Please let us know :thumbsup:"
+        )
+        LOG.debug(
+            "Please feel free to try ShiftLeft NG SAST. To enable visit https://www.shiftleft.io/register to signup and pass the tokens as environment variables!"
         )
         return
     convert_args = []
@@ -734,6 +745,7 @@ def main():
     sarif_files = [p.as_posix() for p in Path(reports_dir).rglob("*.sarif")]
     depscan_files = [p.as_posix() for p in Path(reports_dir).rglob("depscan*.json")]
     agg_fname = None
+    baseline_fname = os.path.join(reports_dir, ".sastscan.baseline")
     if scan_mode != "ide":
         agg_fname = utils.get_report_file(
             "scan-full", reports_dir, False, ext_name="json"
@@ -742,7 +754,10 @@ def main():
         src_dir, repo_context, reports_dir, sarif_files
     )
     report_summary, build_status = analysis.summary(
-        sarif_files, depscan_files, agg_fname
+        sarif_files=sarif_files,
+        depscan_files=depscan_files,
+        aggregate_file=agg_fname,
+        baseline_file=baseline_fname,
     )
     git_provider = provider.get_git_provider(repo_context)
     if should_annotate(git_provider, repo_context, findings_file):
@@ -763,6 +778,9 @@ def main():
                 "scan_time_sec": round((end_time - start_time) / 1000000000, 2),
             }
         )
+        # Issue https://github.com/ShiftLeftSecurity/scan-action/issues/23
+        if not sarif_files:
+            create_empty_result(src_dir, reports_dir)
         if not args.noerror and not scan_mode == "ide":
             sys.exit(1 if build_status == "fail" else 0)
     else:

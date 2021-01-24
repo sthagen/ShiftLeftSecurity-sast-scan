@@ -53,6 +53,11 @@ def is_taintable_function(ast_node):
                 "put",
                 "delete",
                 "middleware",
+                "api_view",
+                "action",
+                "csrf_exempt",
+                "deserialise_with",
+                "marshal_with",
             ]:
                 return True
     # Ignore database functions
@@ -61,13 +66,20 @@ def is_taintable_function(ast_node):
         # Common view functions such as django, starlette
         if first_arg_name in ["request", "context", "scope"]:
             return True
+        # Ignore dao classes due to potential FP
+        if first_arg_name in ["conn", "connection", "cls", "session", "session_cls"]:
+            return False
     # Ignore internal functions prefixed with _
     if is_function_with_leading_(ast_node):
         return False
     # Ignore known validation and sanitization functions
-    for n in ["valid", "sanitize", "sanitise", "is_", "set_"]:
-        if ast_node.name.startswith(n):
+    for n in ["valid", "sanitize", "sanitise", "is_", "set_", "assert"]:
+        if n in ast_node.name:
             return False
+    # Should we limit the scan only to web routes?
+    web_route_only = os.environ.get("WEB_ROUTE_ONLY", False)
+    if web_route_only:
+        return False
     return True
 
 
