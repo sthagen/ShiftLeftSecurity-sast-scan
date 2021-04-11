@@ -21,6 +21,8 @@ flask_nostatic_config = [
     "SECURITY_RESET_SALT",
     "SECURITY_LOGIN_SALT",
     "SECURITY_REMEMBER_SALT",
+    "SECRET_KEY_HMAC",
+    "SECRET_KEY_HMAC_2",
 ]
 flask_noset_config = [
     "DEBUG",
@@ -68,7 +70,7 @@ flask_jwt_mustset_config = {
     "JWT_BLACKLIST_ENABLED": {"recommended": True, "default": False},
 }
 
-flask_jwt_message = """Flask JWT extension is not configured correctly for deployment to production and live environments. Default settings that are more appropriate for development environment are in use.
+flask_jwt_message = """JWT module is not configured correctly for deployment to production and live environments. Default settings that are more appropriate for development environment are in use.
 
 ## Additional information
 

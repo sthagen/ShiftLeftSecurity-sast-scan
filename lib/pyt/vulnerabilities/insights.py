@@ -906,6 +906,8 @@ def _check_flask_common_misconfig(ast_tree, path):
     """Look for common security misconfiguration in Flask apps"""
     violations = []
     has_flask_run = has_method_call("app.run(??)", ast_tree)
+    if not has_flask_run:
+        has_flask_run = has_method_call("http_server.listen(??)", ast_tree)
     if has_import_like("flask", ast_tree) and has_flask_run:
         config_method_patterns = [
             "??.from_file(??)",
@@ -925,7 +927,7 @@ def _check_flask_common_misconfig(ast_tree, path):
         for k, v in config_dict.items():
             all_keys.append(k)
             # Static configs
-            if k in rules.flask_nostatic_config:
+            if k.upper() in rules.flask_nostatic_config:
                 source, sink = convert_node_source_sink(v, path)
                 if sink.trigger_word:
                     obfuscated_label = sink.label
@@ -1118,4 +1120,73 @@ def _check_flask_common_misconfig(ast_tree, path):
                             rules.rules_message_map["flask-misconfiguration-jwt"],
                         )
                     )
+    # jwt checks
+    if has_import_like("jwt", ast_tree):
+        method_obj_list = get_method_as_dict("jwt.decode(??)", ast_tree)
+        if method_obj_list:
+            for method_obj in method_obj_list:
+                if not method_obj:
+                    continue
+                start_line = method_obj.get("lineno")
+                method_args = method_obj.get("args")
+                for margs in method_args:
+                    method_keywords = method_obj.get("keywords")
+                    for mkey_obj in method_keywords:
+                        kw_arg = mkey_obj.get("arg")
+                        kw_elts = None
+                        if mkey_obj.get("value").get("_type") == "List":
+                            kw_elts = mkey_obj.get("value").get("elts")
+                        if mkey_obj.get("value").get("_type") == "Constant":
+                            kw_elts = [mkey_obj.get("value")]
+                        if not kw_arg or not kw_elts:
+                            continue
+                        kw_arg_value = kw_elts[0].get("value")
+                        source, sink = convert_dict_source_sink(
+                            {
+                                "source_type": "Config",
+                                "source_trigger": kw_arg,
+                                "source_line_number": start_line,
+                                "sink_type": "Constant",
+                                "sink_trigger": kw_arg_value,
+                                "sink_line_number": start_line,
+                            },
+                            path,
+                        )
+                        if kw_arg == "verify" and kw_arg_value == False:
+                            violations.append(
+                                Insight(
+                                    f"""Security Misconfiguration with the config `{kw_arg}` not set to the recommended value `True` for production use""",
+                                    "Missing Security Controls",
+                                    "flask-misconfiguration-jwt",
+                                    "CWE-732",
+                                    "MEDIUM",
+                                    "a6-misconfiguration",
+                                    source,
+                                    sink,
+                                    rules.rules_message_map[
+                                        "flask-misconfiguration-jwt"
+                                    ],
+                                )
+                            )
+                        elif kw_arg == "algorithms" and (
+                            "HS256" in kw_arg_value
+                            or "HS384" in kw_arg_value
+                            or "HS512" in kw_arg_value
+                        ):
+                            violations.append(
+                                Insight(
+                                    "Use an asymmetric RSA based algorithm such as RS512 for JWT",
+                                    "Security Misconfiguration",
+                                    "flask-misconfiguration-jwt",
+                                    "CWE-327",
+                                    "LOW",
+                                    "a6-misconfiguration",
+                                    source,
+                                    sink,
+                                    rules.rules_message_map[
+                                        "flask-misconfiguration-jwt"
+                                    ],
+                                )
+                            )
+
     return violations
