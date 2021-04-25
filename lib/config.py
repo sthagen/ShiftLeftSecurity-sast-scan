@@ -188,6 +188,7 @@ ignore_files = [
     ".snap",
     ".pb.go",
     ".tests.py",
+    ".vdb",
 ]
 
 # Tool specific ignored rules
@@ -743,7 +744,7 @@ build_tools_map = {
         "sbt": ["sbt", "compile"],
     },
     "nodejs": {
-        "npm": ["npm", "install"],
+        "npm": ["npm", "install", "--prefer-offline", "--no-audit", "--progress=false"],
         "yarn": ["yarn", "install"],
         "rush": ["rush", "install", "--bypass-policy", "--no-link"],
     },
