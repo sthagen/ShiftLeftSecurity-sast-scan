@@ -12,7 +12,6 @@ script:
   - cp tools_config/io.shiftleft.scan.appdata.xml AppDir/usr/share/metainfo/
   # Install application dependencies
   - python3 -m pip install --no-cache-dir --ignore-installed --prefix=/usr --root=AppDir -r ./requirements.txt --no-warn-script-location
-  - mv AppDir/usr/bin/scan AppDir/usr/bin/depscan
   - chmod +x AppDir/usr/src/appimage-reqs.sh && AppDir/usr/src/appimage-reqs.sh AppDir
   - npm install --no-audit --progress=false --only=production --no-save --prefix AppDir/usr/local/lib yarn @appthreat/cdxgen @microsoft/rush
   - mkdir -p AppDir/opt/phpsast && cd AppDir/opt/phpsast && composer init --name shiftleft/scan --description scan --quiet && composer require --quiet --no-cache -n --no-ansi --dev vimeo/psalm:^4.1
@@ -20,7 +19,6 @@ script:
 
 AppDir:
   path: ./AppDir
-
   app_info:
     id: io.shiftleft.scan
     name: scan
@@ -59,7 +57,8 @@ AppDir:
     env:
       PATH: '${APPDIR}/usr/bin:${APPDIR}/usr/bin/nodejs/bin:${PATH}:${APPDIR}/opt/phpsast/vendor/bin:${APPDIR}/usr/local/lib/node_modules/.bin:'
       PYTHONHOME: '${APPDIR}/usr'
-      PYTHONPATH: '${APPDIR}/usr/lib/python3.8/site-packages'
+      PYTHONPATH: '${APPDIR}/usr/lib/python3.8/site-packages:$APPDIR/usr/lib/python3.8:$APPDIR/usr/lib/python3.8/lib-dynload'
+      SSL_CERT_FILE: '${APPDIR}/usr/lib/python3.8/site-packages/certifi/cacert.pem'
       PYTHONUNBUFFERED: '1'
       APP_SRC_DIR: '${APPDIR}/usr/src'
       TOOLS_CONFIG_DIR: '${APPDIR}/usr/src/tools_config'

@@ -8,6 +8,7 @@ import subprocess
 from functools import lru_cache
 
 from _ast import AST
+
 from lib.pyt.core.astsearch import ASTPatternFinder, prepare_pattern
 from lib.pyt.core.transformer import PytTransformer
 
@@ -147,7 +148,9 @@ def get_assignments_as_dict(pattern, ast_tree):
                     else:
                         left_hand_side = target.slice.value
                 key = ""
-                if hasattr(left_hand_side, "value"):
+                if isinstance(left_hand_side, ast.Attribute):
+                    key = left_hand_side.attr
+                elif hasattr(left_hand_side, "value"):
                     key = left_hand_side.value
                 elif hasattr(left_hand_side, "id"):
                     key = left_hand_side.id
