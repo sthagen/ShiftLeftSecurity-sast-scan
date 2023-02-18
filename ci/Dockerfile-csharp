@@ -67,7 +67,7 @@ LABEL maintainer="ShiftLeftSecurity" \
 
 ENV APP_SRC_DIR=/usr/local/src \
     DEPSCAN_CMD="/usr/local/bin/depscan" \
-    MVN_CMD="/opt/apache-maven/bin/mvn" \
+    MVN_CMD="/usr/bin/mvn" \
     PMD_CMD="/opt/pmd-bin/bin/run.sh pmd" \
     PYTHONUNBUFFERED=1 \
     DOTNET_CLI_TELEMETRY_OPTOUT=1 \
@@ -89,7 +89,7 @@ USER root
 RUN python3 -m pip install --upgrade pip \
     && pip3 install --no-cache-dir wheel \
     && pip3 install --no-cache-dir -r /usr/local/src/requirements.txt \
-    && npm install --no-audit --progress=false --only=production -g @appthreat/cdxgen @ngcloudsec/cdxgen-plugins-bin @microsoft/rush --unsafe-perm \
+    && npm install --no-audit --progress=false --only=production -g @cyclonedx/cdxgen  @microsoft/rush --unsafe-perm \
     && microdnf clean all
 
 WORKDIR /app
